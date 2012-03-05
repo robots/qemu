@@ -109,16 +109,19 @@ op_helper.o ldst_helper.o user-exec.o: QEMU_CFLAGS += $(HELPER_CFLAGS)
 # cpu_signal_handler() in user-exec.c.
 signal.o: QEMU_CFLAGS += $(HELPER_CFLAGS)
 
+ifdef CONFIG_GCA
+QEMU_CFLAGS += $(GCA_CFLAGS)
+endif #CONFIG_GCA
+
 #########################################################
 # Linux user emulator target
 
 ifdef CONFIG_LINUX_USER
 
 $(call set-vpath, $(SRC_PATH)/linux-user:$(SRC_PATH)/linux-user/$(TARGET_ABI_DIR))
-
 QEMU_CFLAGS+=-I$(SRC_PATH)/linux-user/$(TARGET_ABI_DIR) -I$(SRC_PATH)/linux-user
 obj-y = main.o syscall.o strace.o mmap.o signal.o thunk.o \
-      elfload.o linuxload.o uaccess.o gdbstub.o cpu-uname.o \
+      elfload.o linuxload.o uaccess.o gdbstub.o gca.o cpu-uname.o \
       user-exec.o $(oslib-obj-y)
 
 obj-$(TARGET_HAS_BFLT) += flatload.o
@@ -195,7 +198,7 @@ endif #CONFIG_BSD_USER
 # System emulator target
 ifdef CONFIG_SOFTMMU
 
-obj-y = arch_init.o cpus.o monitor.o machine.o gdbstub.o balloon.o ioport.o
+obj-y = arch_init.o cpus.o monitor.o machine.o gdbstub.o gca.o balloon.o ioport.o
 # virtio has to be here due to weird dependency between PCI and virtio-net.
 # need to fix this properly
 obj-$(CONFIG_NO_PCI) += pci-stub.o

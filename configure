@@ -140,6 +140,8 @@ attr=""
 libattr=""
 xfs=""
 
+gca="yes"
+
 vhost_net="no"
 kvm="no"
 gprof="no"
@@ -606,6 +608,10 @@ for opt do
   ;;
   --enable-vnc) vnc="yes"
   ;;
+  --disable-gca) gca="no"
+  ;;
+  --enable-gca) gca="yes"
+  ;;
   --fmod-lib=*) fmod_lib="$optarg"
   ;;
   --fmod-inc=*) fmod_inc="$optarg"
@@ -1035,6 +1041,8 @@ echo "  --disable-vnc-png        disable PNG compression for VNC server (default
 echo "  --enable-vnc-png         enable PNG compression for VNC server"
 echo "  --disable-vnc-thread     disable threaded VNC server"
 echo "  --enable-vnc-thread      enable threaded VNC server"
+echo "  --disable-gca            disable GDB context awareness"
+echo "  --enable-gca             enable GDB context awareness"
 echo "  --disable-curses         disable curses output"
 echo "  --enable-curses          enable curses output"
 echo "  --disable-curl           disable curl connectivity"
@@ -2018,6 +2026,24 @@ EOF
 fi
 
 ##########################################
+# gca probe
+
+if test "$gca" != "no" ; then
+  cat > $TMPC <<EOF
+#include <Python.h>
+int main(void) { Py_Initialize(); Py_Finalize(); }
+EOF
+  gca_cflags=`pkg-config python-2.7 --cflags 2>/dev/null`
+  gca_libs=`pkg-config python-2.7 --libs 2>/dev/null`
+  if compile_prog "$gca_cflags" "$gca_libs" ; then
+    LIBS="$gca_libs $LIBS"
+  else
+		feature_not_found "gca"
+    gca=no
+  fi
+fi
+
+##########################################
 # pthread probe
 PTHREADLIBS_LIST="-pthread -lpthread -lpthreadGC2"
 
@@ -2912,6 +2938,7 @@ fi
 if test -n "$sparc_cpu"; then
     echo "Target Sparc Arch $sparc_cpu"
 fi
+echo "gca support       $gca"
 echo "xen support       $xen"
 echo "brlapi support    $brlapi"
 echo "bluez  support    $bluez"
@@ -3168,6 +3195,10 @@ fi
 if test "$curl" = "yes" ; then
   echo "CONFIG_CURL=y" >> $config_host_mak
   echo "CURL_CFLAGS=$curl_cflags" >> $config_host_mak
+fi
+if test "$gca" = "yes" ; then
+  echo "CONFIG_GCA=y" >> $config_host_mak
+  echo "GCA_CFLAGS=$gca_cflags" >> $config_host_mak
 fi
 if test "$brlapi" = "yes" ; then
   echo "CONFIG_BRLAPI=y" >> $config_host_mak
