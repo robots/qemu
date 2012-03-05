@@ -41,6 +41,10 @@
 #include "qemu_socket.h"
 #include "kvm.h"
 
+#ifdef CONFIG_GCA
+#include "gca.h"
+#endif
+
 #ifndef TARGET_CPU_MEMORY_RW_DEBUG
 static inline int target_memory_rw_debug(CPUState *env, target_ulong addr,
                                          uint8_t *buf, int len, int is_write)
@@ -290,6 +294,8 @@ typedef struct GDBState {
     CPUState *c_cpu; /* current CPU for step/continue ops */
     CPUState *g_cpu; /* current CPU for other ops */
     CPUState *query_cpu; /* for q{f|s}ThreadInfo */
+		target_ulong c_tid;
+		target_ulong g_tid;
     enum RSState state; /* parsing state */
     char line_buf[MAX_PACKET_LENGTH];
     int line_buf_index;
@@ -476,9 +482,9 @@ static int put_packet_binary(GDBState *s, const char *buf, int len)
 /* return -1 if error, 0 if OK */
 static int put_packet(GDBState *s, const char *buf)
 {
-#ifdef DEBUG_GDB
+//#ifdef DEBUG_GDB
     printf("reply='%s'\n", buf);
-#endif
+//#endif
 
     return put_packet_binary(s, buf, strlen(buf));
 }
@@ -1766,6 +1772,32 @@ static int gdb_write_register(CPUState *env, uint8_t *mem_buf, int reg)
     return 0;
 }
 
+void gdb_read_registers(CPUState *env, uint8_t *mem_buf, target_ulong *len)
+{
+	target_ulong addr;
+	target_ulong reg_size;
+	target_ulong offset = 0;
+
+	for (addr = 0; addr < num_g_regs; addr++) {
+		reg_size = gdb_read_register(env, mem_buf + offset, addr);
+		offset += reg_size;
+	}
+
+	*len = offset;
+}
+
+void gdb_write_registers(CPUState *env, uint8_t *mem_buf, target_ulong len)
+{
+	target_ulong addr;
+	target_ulong reg_size;
+
+	for (addr = 0; addr < num_g_regs && len > 0; addr++) {
+		reg_size = gdb_write_register(env, mem_buf, addr);
+		len -= reg_size;
+		mem_buf += reg_size;
+	}
+}
+
 #if !defined(TARGET_XTENSA)
 /* Register a supplemental set of CPU registers.  If g_pos is nonzero it
    specifies the first register number and these registers are included in
@@ -1970,18 +2002,23 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
     char buf[MAX_PACKET_LENGTH];
     uint8_t mem_buf[MAX_PACKET_LENGTH];
     uint8_t *registers;
-    target_ulong addr, len;
+    target_ulong addr, len, off;
 
-#ifdef DEBUG_GDB
+//#ifdef DEBUG_GDB
     printf("command='%s'\n", line_buf);
-#endif
+//#endif
     p = line_buf;
     ch = *p++;
     switch(ch) {
     case '?':
-        /* TODO: Make this return the correct value for user-mode.  */
-        snprintf(buf, sizeof(buf), "T%02xthread:%02x;", GDB_SIGNAL_TRAP,
-                 gdb_id(s->c_cpu));
+				if (gca_active()) {
+					snprintf(buf, sizeof(buf), "T%02xthread:%08x;", GDB_SIGNAL_TRAP,
+									 gca_thread_getcurrent(s->c_cpu));
+				} else {
+					/* TODO: Make this return the correct value for user-mode.  */
+					snprintf(buf, sizeof(buf), "T%02xthread:%02x;", GDB_SIGNAL_TRAP,
+									 gdb_id(s->c_cpu));
+				}
         put_packet(s, buf);
         /* Remove all the breakpoints when this query is issued,
          * because gdb is doing and initial connect and the state
@@ -1990,14 +2027,16 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         gdb_breakpoint_remove_all();
         break;
     case 'c':
+				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
         if (*p != '\0') {
             addr = strtoull(p, (char **)&p, 16);
             gdb_set_cpu_pc(s, addr);
         }
         s->signal = 0;
         gdb_continue(s);
-	return RS_IDLE;
+        return RS_IDLE;
     case 'C':
+				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
         s->signal = gdb_signal_to_target (strtoul(p, (char **)&p, 16));
         if (s->signal == -1)
             s->signal = 0;
@@ -2073,13 +2112,14 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         put_packet(s, "OK");
         break;
     case 's':
+				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
         if (*p != '\0') {
             addr = strtoull(p, (char **)&p, 16);
             gdb_set_cpu_pc(s, addr);
         }
         cpu_single_step(s->c_cpu, sstep_flags);
         gdb_continue(s);
-	return RS_IDLE;
+        return RS_IDLE;
     case 'F':
         {
             target_ulong ret;
@@ -2105,27 +2145,30 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         }
         break;
     case 'g':
-        cpu_synchronize_state(s->g_cpu);
-        env = s->g_cpu;
-        len = 0;
-        for (addr = 0; addr < num_g_regs; addr++) {
-            reg_size = gdb_read_register(s->g_cpu, mem_buf + len, addr);
-            len += reg_size;
-        }
+				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+				env = first_cpu;
+				if (gca_active()) {
+					gca_thread_regs_read(env, s->g_tid, mem_buf, &len);
+				} else {
+					cpu_synchronize_state(env);
+					len = 0;
+					gdb_read_registers(env, mem_buf, &len);
+				}
         memtohex(buf, mem_buf, len);
         put_packet(s, buf);
         break;
     case 'G':
-        cpu_synchronize_state(s->g_cpu);
-        env = s->g_cpu;
-        registers = mem_buf;
-        len = strlen(p) / 2;
-        hextomem((uint8_t *)registers, p, len);
-        for (addr = 0; addr < num_g_regs && len > 0; addr++) {
-            reg_size = gdb_write_register(s->g_cpu, registers, addr);
-            len -= reg_size;
-            registers += reg_size;
-        }
+				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+				env = s->g_cpu;
+				registers = mem_buf;
+				len = strlen(p) / 2;
+				hextomem((uint8_t *)registers, p, len);
+				if (gca_active()) {
+					gca_thread_regs_write(env, s->g_tid, registers, len); 
+				} else {
+					cpu_synchronize_state(env);
+					gdb_write_registers(env, registers, len);
+				}
         put_packet(s, "OK");
         break;
     case 'm':
@@ -2133,12 +2176,23 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         if (*p == ',')
             p++;
         len = strtoull(p, NULL, 16);
-        if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 0) != 0) {
-            put_packet (s, "E14");
-        } else {
-            memtohex(buf, mem_buf, len);
-            put_packet(s, buf);
-        }
+				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+				env = first_cpu;
+				if (gca_active()) {
+					if (gca_thread_mem_read(env, s->g_tid, addr, mem_buf, len)) {
+						memtohex(buf, mem_buf, len);
+						put_packet(s, buf);
+					} else {
+						put_packet (s, "E14");
+					}
+				} else {
+					if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 0) != 0) {
+							put_packet (s, "E14");
+					} else {
+							memtohex(buf, mem_buf, len);
+							put_packet(s, buf);
+					}
+				}
         break;
     case 'M':
         addr = strtoull(p, (char **)&p, 16);
@@ -2148,13 +2202,27 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         if (*p == ':')
             p++;
         hextomem(mem_buf, p, len);
-        if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 1) != 0) {
-            put_packet(s, "E14");
-        } else {
-            put_packet(s, "OK");
-        }
+				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+				env = first_cpu;
+				if (gca_active()) {
+					if (gca_thread_mem_write(env, s->g_tid, addr, mem_buf, len)) {
+							put_packet(s, "OK");
+					} else {
+							put_packet(s, "E14");
+					}
+				} else {
+					if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 1) != 0) {
+							put_packet(s, "E14");
+					} else {
+							put_packet(s, "OK");
+					}
+				}
         break;
     case 'p':
+				// TODO: we should probably handle this :-)
+				if (gca_active())
+					goto unknown_command;
+
         /* Older gdb are really dumb, and don't use 'g' if 'p' is avaialable.
            This works, but can be very slow.  Anything new enough to
            understand XML also knows how to use this properly.  */
@@ -2170,6 +2238,10 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         }
         break;
     case 'P':
+				// TODO: we should probably handle this :-)
+				if (gca_active())
+					goto unknown_command;
+
         if (!gdb_has_xml)
             goto unknown_command;
         addr = strtoull(p, (char **)&p, 16);
@@ -2207,34 +2279,66 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             put_packet(s, "OK");
             break;
         }
-        env = find_cpu(thread);
-        if (env == NULL) {
-            put_packet(s, "E22");
-            break;
-        }
-        switch (type) {
-        case 'c':
-            s->c_cpu = env;
-            put_packet(s, "OK");
-            break;
-        case 'g':
-            s->g_cpu = env;
-            put_packet(s, "OK");
-            break;
-        default:
-             put_packet(s, "E22");
-             break;
-        }
+#ifdef CONFIG_GCA
+				if (gca_active()) { // TODO: check thread active!
+					switch (type) {
+					case 'c':
+							s->c_tid = thread;
+							put_packet(s, "OK");
+							break;
+					case 'g':
+							s->g_tid = thread;
+							put_packet(s, "OK");
+							break;
+					default:
+							 put_packet(s, "E22");
+							 break;
+					}
+				} else {
+#endif
+					env = find_cpu(thread);
+					if (env == NULL) {
+							put_packet(s, "E22");
+							break;
+					}
+					switch (type) {
+					case 'c':
+							s->c_cpu = env;
+							put_packet(s, "OK");
+							break;
+					case 'g':
+							s->g_cpu = env;
+							put_packet(s, "OK");
+							break;
+					default:
+							 put_packet(s, "E22");
+							 break;
+					}
+#ifdef CONFIG_GCA
+				}
+#endif
         break;
     case 'T':
         thread = strtoull(p, (char **)&p, 16);
-        env = find_cpu(thread);
+#ifdef CONFIG_GCA
+				if (gca_active()) {
+					if (gca_thread_isalive(s->g_cpu, thread)) {
+							put_packet(s, "OK");
+					} else {
+							put_packet(s, "E22");
+					}
+				} else {
+#endif
+					env = find_cpu(thread);
 
-        if (env != NULL) {
-            put_packet(s, "OK");
-        } else {
-            put_packet(s, "E22");
-        }
+					if (env != NULL) {
+							put_packet(s, "OK");
+					} else {
+							put_packet(s, "E22");
+					}
+#ifdef CONFIG_GCA
+				}
+#endif
         break;
     case 'q':
     case 'Q':
@@ -2262,33 +2366,77 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             put_packet(s, "OK");
             break;
         } else if (strcmp(p,"C") == 0) {
-            /* "Current thread" remains vague in the spec, so always return
-             *  the first CPU (gdb returns the first thread). */
-            put_packet(s, "QC1");
+#ifdef CONFIG_GCA
+						if (gca_active()) {
+							addr = gca_thread_getcurrent(s->g_cpu);
+							snprintf(buf, sizeof(buf), "QC%x", addr);
+							put_packet(s, buf);
+						} else {
+#endif
+							/* "Current thread" remains vague in the spec, so always return
+							 *  the first CPU (gdb returns the first thread). */
+							put_packet(s, "QC1");
+#ifdef CONFIG_GCA
+						}
+#endif
             break;
         } else if (strcmp(p,"fThreadInfo") == 0) {
-            s->query_cpu = first_cpu;
-            goto report_cpuinfo;
+#ifdef CONFIG_GCA
+						if (gca_active()) {
+							gca_threadlist_create(s->g_cpu);
+						} else {
+#endif
+							s->query_cpu = first_cpu;
+#ifdef CONFIG_GCA
+						}
+#endif
+						goto report_cpuinfo;
         } else if (strcmp(p,"sThreadInfo") == 0) {
         report_cpuinfo:
-            if (s->query_cpu) {
-                snprintf(buf, sizeof(buf), "m%x", gdb_id(s->query_cpu));
-                put_packet(s, buf);
-                s->query_cpu = s->query_cpu->next_cpu;
-            } else
-                put_packet(s, "l");
+#ifdef CONFIG_GCA
+						if (gca_active()) {
+							if (gca_threadlist_count(s->g_cpu) > 0) {
+								snprintf(buf, sizeof(buf), "m%x", gca_threadlist_getnext(s->g_cpu));
+								put_packet(s, buf);
+							} else {
+								put_packet(s, "l");
+							}
+						} else {
+#endif
+							if (s->query_cpu) {
+									snprintf(buf, sizeof(buf), "m%x", gdb_id(s->query_cpu));
+									put_packet(s, buf);
+									s->query_cpu = s->query_cpu->next_cpu;
+							} else {
+									put_packet(s, "l");
+							}
+#ifdef CONFIG_GCA
+						}
+#endif
             break;
         } else if (strncmp(p,"ThreadExtraInfo,", 16) == 0) {
-            thread = strtoull(p+16, (char **)&p, 16);
-            env = find_cpu(thread);
-            if (env != NULL) {
-                cpu_synchronize_state(env);
-                len = snprintf((char *)mem_buf, sizeof(mem_buf),
-                               "CPU#%d [%s]", env->cpu_index,
-                               env->halted ? "halted " : "running");
-                memtohex(buf, mem_buf, len);
-                put_packet(s, buf);
-            }
+						thread = strtoull(p+16, (char **)&p, 16);
+#ifdef CONFIG_GCA
+						if (gca_active()) {
+							env = s->g_cpu; // TODO: need to find correct cpu for thread
+							gca_thread_getinfo(env, thread, (char *)mem_buf, &len);
+
+							memtohex(buf, mem_buf, len);
+							put_packet(s, buf);
+						} else {
+#endif
+							env = find_cpu(thread);
+							if (env != NULL) {
+									cpu_synchronize_state(env);
+									len = snprintf((char *)mem_buf, sizeof(mem_buf),
+																 "CPU#%d [%s]", env->cpu_index,
+																 env->halted ? "halted " : "running");
+							}
+							memtohex(buf, mem_buf, len);
+							put_packet(s, buf);
+#ifdef CONFIG_GCA
+						}
+#endif
             break;
         }
 #ifdef CONFIG_USER_ONLY
@@ -2368,6 +2516,34 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             break;
         }
 #endif
+        if (strncmp(p, "Symbol:", 7) == 0) {
+#ifdef CONFIG_GCA
+					if (gca_active()) {
+						if (*(p+7) != ':') {
+							addr = strtoull(p+7, (char **)&p, 16);
+							if (*p == ':') p++;
+							len = strlen(p);
+							hextomem(mem_buf, p, len);
+							mem_buf[len] = 0;
+							gca_symbol_add((const char *)mem_buf, addr);
+						}
+						if (gca_symbol_getunknown((char *)mem_buf, &len)) {
+							off = snprintf(buf, sizeof(buf), "qSymbol:");
+							if (off + len < MAX_PACKET_LENGTH) {
+								memtohex(buf + off, mem_buf, len);
+							}
+							put_packet(s, buf);
+						} else {
+							put_packet(s, "OK");
+						}
+					} else {
+#endif
+						put_packet(s, "OK");
+#ifdef CONFIG_GCA
+					}
+#endif
+					break;
+				}
         /* Unrecognised 'q' command.  */
         goto unknown_command;
 

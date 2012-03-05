@@ -133,6 +133,7 @@ int main(int argc, char **argv)
 #include "console.h"
 #include "sysemu.h"
 #include "gdbstub.h"
+#include "gca.h"
 #include "qemu-timer.h"
 #include "qemu-char.h"
 #include "cache-utils.h"
@@ -2272,6 +2273,7 @@ int main(int argc, char **argv, char **envp)
     const char *vga_model = NULL;
     const char *pid_file = NULL;
     const char *incoming = NULL;
+    const char *gca_file = NULL;
 #ifdef CONFIG_VNC
     int show_vnc_port = 0;
 #endif
@@ -2681,6 +2683,9 @@ int main(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_gdb:
                 add_device_config(DEV_GDB, optarg);
+                break;
+            case QEMU_OPTION_gca:
+                gca_file = optarg;
                 break;
             case QEMU_OPTION_L:
                 data_dir = optarg;
@@ -3314,6 +3319,9 @@ int main(int argc, char **argv, char **envp)
     }
 
     configure_accelerator();
+
+    if (gca_file != NULL)
+        gca_init(gca_file);
 
     qemu_init_cpu_loop();
     if (qemu_init_main_loop()) {
