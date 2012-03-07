@@ -29,6 +29,7 @@ static inline int target_memory_rw_debug(CPUState *env, target_ulong addr,
 
 int gca_state = 0;
 PyObject *gca_module;
+PyObject *True;
 
 
 unsigned int gca_threadlist_create(CPUState *cpu)
@@ -186,7 +187,6 @@ int gca_thread_isalive(CPUState *cpu, target_ulong id)
 	PyObject *fnc;
 	PyObject *args;
 	PyObject *val;
-	PyObject *tru = Py_True;
 	int ret = 0;
 
 	fnc = PyObject_GetAttrString(gca_module, "thread_isalive");
@@ -209,10 +209,9 @@ int gca_thread_isalive(CPUState *cpu, target_ulong id)
 			return 0;
 		}
 
-		if (val == tru) {
+		if (val == True) {
 			ret = 1;
 		}
-		Py_DECREF(tru);
 		Py_DECREF(val);
 		
 	}
@@ -362,12 +361,10 @@ int gca_thread_regs_write(CPUState *cpu, target_ulong id, uint8_t *regs, target_
 
 		if (val != NULL) {
 			if (PyBool_Check(val)) {
-				PyObject *tru = Py_True;
-				if (val == tru){
+				if (val == True){
 					ret = 1;
 				}
 
-				Py_DECREF(tru);
 			} else {
 				GCA_ERROR("unexpected type");
 			}
@@ -455,12 +452,9 @@ int gca_thread_mem_write(CPUState *cpu, target_ulong id, target_ulong addr, uint
 
 		if (val != NULL) {
 			if (PyBool_Check(val)) {
-				PyObject *tru = Py_True;
-				if (val == tru) {
+				if (val == True) {
 					ret = 1;
 				}
-
-				Py_DECREF(tru);
 			} else {
 				GCA_ERROR("unexpected type");
 			}
@@ -642,6 +636,8 @@ int gca_init(const char *file)
 
 	printf("GCA: loading \"%s\"\n", file);
 	Py_Initialize();
+	True = Py_True;
+
 	Py_InitModule("gca", GcaMethods);
 
 	py_file = PyString_FromString(file);
@@ -666,6 +662,7 @@ int gca_init(const char *file)
 void gca_destroy(void)
 {
 	Py_DECREF(gca_module);
+	Py_DECREF(True);
 	Py_Finalize();
 }
 
