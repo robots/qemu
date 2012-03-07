@@ -1850,7 +1850,7 @@ static const int xlat_gdb_type[] = {
 };
 #endif
 
-static int gdb_breakpoint_insert(target_ulong addr, target_ulong len, int type)
+int gdb_breakpoint_insert(target_ulong addr, target_ulong len, int type)
 {
     CPUState *env;
     int err = 0;
@@ -1884,7 +1884,7 @@ static int gdb_breakpoint_insert(target_ulong addr, target_ulong len, int type)
     }
 }
 
-static int gdb_breakpoint_remove(target_ulong addr, target_ulong len, int type)
+int gdb_breakpoint_remove(target_ulong addr, target_ulong len, int type)
 {
     CPUState *env;
     int err = 0;
@@ -1917,7 +1917,7 @@ static int gdb_breakpoint_remove(target_ulong addr, target_ulong len, int type)
     }
 }
 
-static void gdb_breakpoint_remove_all(void)
+void gdb_breakpoint_remove_all(void)
 {
     CPUState *env;
 
@@ -2596,6 +2596,15 @@ static void gdb_vm_state_change(void *opaque, int running, RunState state)
             env->watchpoint_hit = NULL;
             goto send_packet;
         }
+#ifdef CONFIG_GCA
+				if (gca_active()) {
+					if (gca_hook_breakpoint(env)) {
+						// do not tell user about the breakpoint
+						tb_flush(env);
+						return;
+					}
+				}
+#endif
         tb_flush(env);
         ret = GDB_SIGNAL_TRAP;
         break;

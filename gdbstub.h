@@ -30,6 +30,10 @@ void gdb_register_coprocessor(CPUState *env,
                               gdb_reg_cb get_reg, gdb_reg_cb set_reg,
                               int num_regs, const char *xml, int g_pos);
 
+int gdb_breakpoint_insert(target_ulong addr, target_ulong len, int type);
+int gdb_breakpoint_remove(target_ulong addr, target_ulong len, int type);
+void gdb_breakpoint_remove_all(void);
+
 void gdb_read_registers(CPUState *env, uint8_t *mem_buf, target_ulong *len);
 void gdb_write_registers(CPUState *env, uint8_t *mem_buf, target_ulong len);
 

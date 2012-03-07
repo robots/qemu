@@ -544,6 +544,47 @@ unsigned int gca_symbol_add(const char *name, target_ulong addr)
 	return 0;
 }
 
+int gca_hook_breakpoint(CPUState *cpu)
+{
+	PyObject *fnc = NULL;
+	PyObject *args = NULL;
+	PyObject *val = NULL;
+	int ret = 0;
+
+	fnc = PyObject_GetAttrString(gca_module, "hook_breakpoint");
+
+	if (fnc && PyCallable_Check(fnc)) {
+		args = PyTuple_New(1);
+		PyTuple_SetItem(args, 0, PyLong_FromLong((long int)cpu));
+
+		val = PyObject_CallObject(fnc, args);
+		Py_DECREF(args);
+
+		if (val != NULL) {
+			if (PyBool_Check(val)) {
+				if (val == True) {
+					ret = 1;
+				}
+			} else {
+				GCA_ERROR("unexpected type");
+			}
+		}
+	}
+
+	if (val)
+		Py_DECREF(val);
+
+	if (fnc)
+		Py_DECREF(fnc);
+
+	if (PyErr_Occurred()) {
+		GCA_ERROR("interpreter error - disabling");
+		PyErr_Print();
+	}
+
+	return ret;
+}
+
 // target_memory_write(cpu, addr, string)
 static PyObject* gca_target_memory_write(PyObject *self, PyObject *args)
 {
@@ -617,11 +658,60 @@ static PyObject* gca_target_regs_read(PyObject *self, PyObject *args)
 	return Py_BuildValue("s#", data, len);
 }
 
+static PyObject* gca_breakpoint_insert(PyObject *self, PyObject *args)
+{
+	target_ulong addr;
+	target_ulong len;
+	int type;
+	int ret;
+
+	if(!PyArg_ParseTuple(args, "lli:breakpoint_insert", (long int *)&addr, (long int *)&len, &type))
+		return NULL;
+
+	ret = gdb_breakpoint_insert(addr, len, type);
+
+	if (ret >= 0)
+		return Py_True;
+
+	return Py_False;
+}
+
+static PyObject* gca_breakpoint_remove(PyObject *self, PyObject *args)
+{
+	target_ulong addr;
+	target_ulong len;
+	int type;
+	int ret;
+
+	if(!PyArg_ParseTuple(args, "lli:breakpoint_remove", (long int *)&addr, (long int *)&len, &type))
+		return NULL;
+
+	ret = gdb_breakpoint_remove(addr, len, type);
+
+	if (ret >= 0)
+		return Py_True;
+
+	return Py_False;
+}
+
+static PyObject* gca_breakpoint_remove_all(PyObject *self, PyObject *args)
+{
+	if(!PyArg_ParseTuple(args, ":breakpoint_remove_all"))
+		return NULL;
+
+	gdb_breakpoint_remove_all();
+
+	return Py_True;
+}
+
 static PyMethodDef GcaMethods[] = {
 	{"target_memory_write", gca_target_memory_write, METH_VARARGS, "Write target memory"},
 	{"target_memory_read", gca_target_memory_read, METH_VARARGS, "Read target memory"},
 	{"target_regs_write", gca_target_regs_write, METH_VARARGS, "Write target registers"},
 	{"target_regs_read", gca_target_regs_read, METH_VARARGS, "Read target registers"},
+	{"breakpoint_insert", gca_breakpoint_insert, METH_VARARGS, "Insert breakpoint"},
+	{"breakpoint_remove", gca_breakpoint_remove, METH_VARARGS, "Remove breakpoint"},
+	{"breakpoint_remove_all", gca_breakpoint_remove_all, METH_VARARGS, "Remove all breakpoints"},
 	{NULL, NULL, 0, NULL}
 };
 
