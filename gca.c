@@ -220,6 +220,48 @@ int gca_thread_isalive(CPUState *cpu, target_ulong id)
 	return ret;
 }
 
+int gca_thread_settarget(CPUState *cpu, target_ulong id)
+{
+	PyObject *fnc = NULL;
+	PyObject *args = NULL;
+	PyObject *val = NULL;
+	int ret = 0;
+
+	fnc = PyObject_GetAttrString(gca_module, "thread_settarget");
+
+	if (fnc && PyCallable_Check(fnc)) {
+		args = PyTuple_New(2);
+		PyTuple_SetItem(args, 0, PyLong_FromLong((long int)cpu));
+		PyTuple_SetItem(args, 1, PyLong_FromLong(id));
+
+		val = PyObject_CallObject(fnc, args);
+		Py_DECREF(args);
+
+		if (val != NULL) {
+			if (PyBool_Check(val)) {
+				if (val == True) {
+					ret = 1;
+				}
+			} else {
+				GCA_ERROR("unexpected type");
+			}
+		}
+	}
+
+	if (val)
+		Py_DECREF(val);
+
+	if (fnc)
+		Py_DECREF(fnc);
+
+	if (PyErr_Occurred()) {
+		GCA_ERROR("interpreter error - disabling");
+		PyErr_Print();
+	}
+
+	return ret;
+}
+
 target_ulong gca_thread_getcurrent(CPUState *cpu)
 {
 	PyObject *fnc;
@@ -591,14 +633,14 @@ char *gca_monitor_command(const char *command, const char *arg)
 	return out;
 }
 
-int gca_hook_breakpoint(CPUState *cpu)
+int gca_hook_signal_trap(CPUState *cpu)
 {
 	PyObject *fnc = NULL;
 	PyObject *args = NULL;
 	PyObject *val = NULL;
 	int ret = 0;
 
-	fnc = PyObject_GetAttrString(gca_module, "hook_breakpoint");
+	fnc = PyObject_GetAttrString(gca_module, "hook_signal_trap");
 
 	if (fnc && PyCallable_Check(fnc)) {
 		args = PyTuple_New(1);
@@ -612,6 +654,8 @@ int gca_hook_breakpoint(CPUState *cpu)
 				if (val == True) {
 					ret = 1;
 				}
+			} else if (PyInt_Check(val)) {
+				ret = PyInt_AsLong(val);
 			} else {
 				GCA_ERROR("unexpected type");
 			}

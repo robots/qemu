@@ -2567,7 +2567,7 @@ void gdb_set_stop_cpu(CPUState *env)
 static void gdb_vm_state_change(void *opaque, int running, RunState state)
 {
     GDBState *s = gdbserver_state;
-    CPUState *env = s->c_cpu;
+    CPUState *env = s->c_cpu;// TODO:
     char buf[256];
     const char *type;
     int ret;
@@ -2589,21 +2589,48 @@ static void gdb_vm_state_change(void *opaque, int running, RunState state)
                 type = "";
                 break;
             }
-            snprintf(buf, sizeof(buf),
-                     "T%02xthread:%02x;%swatch:" TARGET_FMT_lx ";",
-                     GDB_SIGNAL_TRAP, gdb_id(env), type,
-                     env->watchpoint_hit->vaddr);
+#ifdef CONFIG_GCA
+            if (gca_active()) {
+                snprintf(buf, sizeof(buf),
+                    "T%02xthread:%08x;%swatch:" TARGET_FMT_lx ";",
+                    GDB_SIGNAL_TRAP, gca_thread_getcurrent(env), type,
+                    env->watchpoint_hit->vaddr);
+            } else {
+#endif
+                snprintf(buf, sizeof(buf),
+                    "T%02xthread:%02x;%swatch:" TARGET_FMT_lx ";",
+                    GDB_SIGNAL_TRAP, gdb_id(env), type,
+                    env->watchpoint_hit->vaddr);
+#ifdef CONFIG_GCA
+            }
+#endif
             env->watchpoint_hit = NULL;
             goto send_packet;
         }
 #ifdef CONFIG_GCA
-				if (gca_active()) {
-					if (gca_hook_breakpoint(env)) {
-						// do not tell user about the breakpoint
-						tb_flush(env);
-						return;
-					}
-				}
+        if (gca_active()) {
+            int hook_ret;
+
+            // sync with current thread id, FIXME?
+            s->c_tid = s->g_tid = gca_thread_getcurrent(env);
+
+            hook_ret = gca_hook_signal_trap(env);
+            if (hook_ret > 0) {
+                // this hook is ours
+                if (hook_ret == 1) {
+                    //printf("target reached \n");
+                } else if (hook_ret == 2) {
+                    tb_flush(env);
+                    gdb_continue(s);
+                    return;
+                } else if (hook_ret == 3) {
+                    tb_flush(env);
+                    cpu_single_step(s->c_cpu, sstep_flags);
+                    gdb_continue(s);
+                    return;
+                }
+            }
+        }
 #endif
         tb_flush(env);
         ret = GDB_SIGNAL_TRAP;
@@ -2633,7 +2660,12 @@ static void gdb_vm_state_change(void *opaque, int running, RunState state)
         ret = GDB_SIGNAL_UNKNOWN;
         break;
     }
-    snprintf(buf, sizeof(buf), "T%02xthread:%02x;", ret, gdb_id(env));
+
+    if (gca_active()) {
+        snprintf(buf, sizeof(buf), "T%02xthread:%08x;", ret, gca_thread_getcurrent(env));
+    } else {
+        snprintf(buf, sizeof(buf), "T%02xthread:%02x;", ret, gdb_id(env));
+    }
 
 send_packet:
     put_packet(s, buf);

@@ -10,6 +10,8 @@ unsigned int gca_thread_getinfo(CPUState *cpu, target_ulong id, char *buf, targe
 target_ulong gca_thread_getcurrent(CPUState *cpu);
 int gca_thread_isalive(CPUState *cpu, target_ulong id);
 
+int gca_thread_settarget(CPUState *cpu, target_ulong id);
+
 /*
 target_ulong gca_thread_getregister(CPUState *cpu, unsigned int id, uint8_t *data);
 target_ulong gca_thread_setregister(CPUState *cpu, unsigned int id, uint8_t *data);
@@ -24,7 +26,7 @@ char *gca_monitor_command(const char *command, const char *arg);
 unsigned int gca_symbol_getunknown(char *name, target_ulong *len);
 unsigned int gca_symbol_add(const char *name, target_ulong addr);
 
-int gca_hook_breakpoint(CPUState *cpu);
+int gca_hook_signal_trap(CPUState *cpu);
 #endif
 
 int gca_active(void);
