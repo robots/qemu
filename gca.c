@@ -677,6 +677,46 @@ int gca_hook_signal_trap(CPUState *cpu)
 }
 
 // target_memory_write(cpu, addr, string)
+static PyObject* gca_target_phy_memory_write(PyObject *self, PyObject *args)
+{
+	CPUState *cpu;
+	long int addr;
+	uint8_t *data;
+	int len;
+
+	if(!PyArg_ParseTuple(args, "lls#:target_physical_memory_write", (long int *)&cpu, &addr, (char *)&data, &len))
+		return NULL;
+
+//	printf("write %lx %lx %lx %d\n", cpu, addr, data, len);
+	cpu_physical_memory_rw(addr, data, len, 1);
+
+	return Py_True;
+}
+
+// target_memory_read(cpu, addr, len)
+static PyObject* gca_target_phy_memory_read(PyObject *self, PyObject *args)
+{
+	CPUState *cpu;
+	long int addr;
+	uint8_t data[4096];
+	int len;
+
+	if(!PyArg_ParseTuple(args, "lli:target_physical_memory_read", (long int *)&cpu, &addr, &len))
+		return NULL;
+
+//	printf("read %lx %lx %d\n", cpu, addr, len);
+	if (len > 4096) {
+		len = 0;
+	}
+
+	if (len > 0) {
+		cpu_physical_memory_rw(addr, data, len, 0);
+	}
+
+	return Py_BuildValue("s#", data, len);
+}
+
+// target_memory_write(cpu, addr, string)
 static PyObject* gca_target_memory_write(PyObject *self, PyObject *args)
 {
 	CPUState *cpu;
@@ -812,6 +852,8 @@ static PyObject* gca_monitor_output(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef GcaMethods[] = {
+	{"target_physical_memory_write", gca_target_phy_memory_write, METH_VARARGS, "Write target memory"},
+	{"target_physical_memory_read", gca_target_phy_memory_read, METH_VARARGS, "Read target memory"},
 	{"target_memory_write", gca_target_memory_write, METH_VARARGS, "Write target memory"},
 	{"target_memory_read", gca_target_memory_read, METH_VARARGS, "Read target memory"},
 	{"target_regs_write", gca_target_regs_write, METH_VARARGS, "Write target registers"},
