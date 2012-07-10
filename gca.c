@@ -11,6 +11,10 @@
 #include <Python.h>
 #include "gca.h"
 
+#ifdef CONFIG_USER_ONLY
+#error "GCA not for user only"
+#endif
+
 #define GCA_ERROR(s) \
 	do { \
 		fprintf(stderr, "%s: %s \n", __func__, s); \
