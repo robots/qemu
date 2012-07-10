@@ -1415,6 +1415,31 @@ STEXI
 show available trace events and their state
 ETEXI
 
+#ifdef CONFIG_GCA
+    {
+        .name       = "gca",
+        .args_type  = "cmd:s,arg:s?",
+        .params     = "gca command [arg]",
+        .help       = "issue command to GCA script",
+        .mhandler.cmd = do_gca_command,
+    },
+STEXI
+@item gca - issue command to GCA script
+ETEXI
+
+    {
+        .name       = "gca_script",
+        .args_type  = "action:s,script:s",
+        .params     = "gca_file (load|unload) [gca-module]",
+        .help       = "forces gca to load script",
+        .mhandler.cmd = do_gca_script_command,
+    },
+STEXI
+@item gca_script - command gca subsystem
+ETEXI
+#endif
+
+
 STEXI
 @end table
 ETEXI
