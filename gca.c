@@ -868,12 +868,19 @@ static PyMethodDef GcaMethods[] = {
 
 int gca_active(void)
 {
+	if (gca_module == NULL)
+		return 0;
+
 	return gca_state == 1;
 }
 
 int gca_init(const char *file)
 {
 	PyObject *py_file;
+
+	if (gca_module) {
+		gca_destroy();
+	}
 
 	printf("GCA: loading \"%s\"\n", file);
 	Py_Initialize();
@@ -902,7 +909,14 @@ int gca_init(const char *file)
 
 void gca_destroy(void)
 {
+	if (!gca_active()) {
+		return;
+	}
+
+	gca_state = 0;
+
 	Py_DECREF(gca_module);
+	gca_module = NULL;
 	Py_DECREF(True);
 	Py_Finalize();
 }
