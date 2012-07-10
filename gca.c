@@ -13,7 +13,7 @@
 
 #define GCA_ERROR(s) \
 	do { \
-		printf("%s: %s \n", __func__, s); \
+		fprintf(stderr, "%s: %s \n", __func__, s); \
 		gca_state = 0; \
 	} while(0);
 
@@ -213,7 +213,6 @@ int gca_thread_isalive(CPUState *cpu, target_ulong id)
 			ret = 1;
 		}
 		Py_DECREF(val);
-		
 	}
 	Py_DECREF(fnc);
 
@@ -264,9 +263,9 @@ int gca_thread_settarget(CPUState *cpu, target_ulong id)
 
 target_ulong gca_thread_getcurrent(CPUState *cpu)
 {
-	PyObject *fnc;
-	PyObject *args;
-	PyObject *val;
+	PyObject *fnc = NULL;
+	PyObject *args = NULL;
+	PyObject *val = NULL;
 	target_ulong ret = 0;
 
 	fnc = PyObject_GetAttrString(gca_module, "thread_getcurrent");
@@ -278,22 +277,27 @@ target_ulong gca_thread_getcurrent(CPUState *cpu)
 		val = PyObject_CallObject(fnc, args);
 		Py_DECREF(args);
 
-		if (PyErr_Occurred()) {
-			PyErr_Print();
-			gca_state = 0;
+		if (val != NULL) {
+			if (PyLong_Check(val)) {
+				ret = PyLong_AsLong(val);
+			} else if (PyInt_Check(val)) {
+				ret = PyInt_AsLong(val);
+			} else {
+				GCA_ERROR("unexpected type");
+			}
 		}
-
-		if (val == NULL) {
-			if (PyErr_Occurred())
-				PyErr_Print();
-			printf("thread_getcurrent failed\n");
-			return 0;
-		}
-
-		ret = PyLong_AsLong(val);
-		Py_DECREF(val);
 	}
-	Py_DECREF(fnc);
+
+	if (val)
+		Py_DECREF(val);
+
+	if (fnc)
+		Py_DECREF(fnc);
+
+	if (PyErr_Occurred()) {
+		GCA_ERROR("interpreter error - disabling");
+		PyErr_Print();
+	}
 
 	return ret;
 }
@@ -720,14 +724,14 @@ static PyObject* gca_target_phy_memory_read(PyObject *self, PyObject *args)
 static PyObject* gca_target_memory_write(PyObject *self, PyObject *args)
 {
 	CPUState *cpu;
-	target_ulong addr;
+	long int addr;
 	uint8_t *data;
 	int len;
 	int ret;
 
-	if(!PyArg_ParseTuple(args, "lls#:target_memory_write", (long int *)&cpu, (long int *)&addr, (char *)&data, &len))
+	if(!PyArg_ParseTuple(args, "lls#:target_memory_write", (long int *)&cpu, &addr, (char *)&data, &len))
 		return NULL;
-	
+
 //	printf("write %lx %lx %lx %d\n", cpu, addr, data, len);
 	ret = target_memory_rw_debug(cpu, addr, data, len, 1);
 
@@ -738,13 +742,13 @@ static PyObject* gca_target_memory_write(PyObject *self, PyObject *args)
 static PyObject* gca_target_memory_read(PyObject *self, PyObject *args)
 {
 	CPUState *cpu;
-	target_ulong addr;
+	long int addr;
 	uint8_t data[4096];
 	int len;
 
-	if(!PyArg_ParseTuple(args, "lli:target_memory_read", (long int *)&cpu, (long int *)&addr, &len))
+	if(!PyArg_ParseTuple(args, "lli:target_memory_read", (long int *)&cpu, &addr, &len))
 		return NULL;
-	
+
 //	printf("read %lx %lx %d\n", cpu, addr, len);
 	if (len > 4096) {
 		len = 0;
@@ -767,7 +771,7 @@ static PyObject* gca_target_regs_write(PyObject *self, PyObject *args)
 
 	if(!PyArg_ParseTuple(args, "ls#:target_regs_write", (long int *)&cpu, (char *)&data, &len))
 		return NULL;
-	
+
 	gdb_write_registers(cpu, data, len);
 
 	return Py_BuildValue("i", ret);
@@ -782,7 +786,6 @@ static PyObject* gca_target_regs_read(PyObject *self, PyObject *args)
 
 	if(!PyArg_ParseTuple(args, "l:target_regs_read", (long int *)&cpu))
 		return NULL;
-	
 
 	gdb_read_registers(cpu, data, &len);
 
@@ -791,30 +794,27 @@ static PyObject* gca_target_regs_read(PyObject *self, PyObject *args)
 
 static PyObject* gca_breakpoint_insert(PyObject *self, PyObject *args)
 {
-	target_ulong addr;
-	target_ulong len;
+	long int addr;
+	long int len;
 	int type;
 	int ret;
 
-	if(!PyArg_ParseTuple(args, "lli:breakpoint_insert", (long int *)&addr, (long int *)&len, &type))
+	if(!PyArg_ParseTuple(args, "lli:breakpoint_insert", &addr, &len, &type))
 		return NULL;
 
 	ret = gdb_breakpoint_insert(addr, len, type);
 
-	if (ret >= 0)
-		return Py_True;
-
-	return Py_False;
+	return PyBool_FromLong(ret >= 0);
 }
 
 static PyObject* gca_breakpoint_remove(PyObject *self, PyObject *args)
 {
-	target_ulong addr;
-	target_ulong len;
+	long int addr;
+	long int len;
 	int type;
 	int ret;
 
-	if(!PyArg_ParseTuple(args, "lli:breakpoint_remove", (long int *)&addr, (long int *)&len, &type))
+	if(!PyArg_ParseTuple(args, "lli:breakpoint_remove", &addr, &len, &type))
 		return NULL;
 
 	ret = gdb_breakpoint_remove(addr, len, type);
