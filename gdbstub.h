@@ -39,6 +39,10 @@ void gdb_write_registers(CPUState *env, uint8_t *mem_buf, target_ulong len);
 
 #endif
 
+#ifndef CONFIG_USER_ONLY
+int gdb_monitor_write(CharDriverState *chr, const uint8_t *buf, int len);
+#endif
+
 #ifdef CONFIG_USER_ONLY
 int gdbserver_start(int);
 #else

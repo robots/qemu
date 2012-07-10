@@ -19,6 +19,8 @@ int gca_thread_regs_write(CPUState *cpu, target_ulong id, uint8_t *regs, target_
 int gca_thread_mem_read(CPUState *cpu, target_ulong id, target_ulong addr, uint8_t *mem, target_ulong len);
 int gca_thread_mem_write(CPUState *cpu, target_ulong id, target_ulong addr, uint8_t *mem, target_ulong len);
 
+char *gca_monitor_command(const char *command, const char *arg);
+
 unsigned int gca_symbol_getunknown(char *name, target_ulong *len);
 unsigned int gca_symbol_add(const char *name, target_ulong addr);
 

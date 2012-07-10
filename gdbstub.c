@@ -3020,7 +3020,7 @@ static void gdb_monitor_output(GDBState *s, const char *msg, int len)
     put_packet(s, buf);
 }
 
-static int gdb_monitor_write(CharDriverState *chr, const uint8_t *buf, int len)
+int gdb_monitor_write(CharDriverState *chr, const uint8_t *buf, int len)
 {
     const char *p = (const char *)buf;
     int max_sz;

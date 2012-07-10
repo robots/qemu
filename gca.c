@@ -544,6 +544,53 @@ unsigned int gca_symbol_add(const char *name, target_ulong addr)
 	return 0;
 }
 
+char *gca_monitor_command(const char *command, const char *arg)
+{
+	PyObject *fnc = NULL;
+	PyObject *val = NULL;
+	PyObject *args = NULL;
+	char *out = NULL;
+
+	fnc = PyObject_GetAttrString(gca_module, "monitor_command");
+
+	if (fnc && PyCallable_Check(fnc)) {
+		args = PyTuple_New(2);
+		PyTuple_SetItem(args, 0, PyString_FromString(command));
+		if (arg) {
+			PyTuple_SetItem(args, 1, PyString_FromString(arg));
+		} else {
+			PyTuple_SetItem(args, 1, PyString_FromString(""));
+		}
+
+		val = PyObject_CallObject(fnc, args);
+		Py_DECREF(args);
+
+		if (val != NULL) {
+			if (PyString_Check(val)) {
+				out = strdup(PyString_AsString(val));
+				if (!out) {
+					GCA_ERROR("out of memory");
+				}
+			} else {
+				GCA_ERROR("unexpected type");
+			}
+		}
+	}
+
+	if (val)
+		Py_DECREF(val);
+
+	if (fnc)
+		Py_DECREF(fnc);
+
+	if (PyErr_Occurred()) {
+		GCA_ERROR("interpreter error - disabling");
+		PyErr_Print();
+	}
+
+	return out;
+}
+
 int gca_hook_breakpoint(CPUState *cpu)
 {
 	PyObject *fnc = NULL;
@@ -704,6 +751,22 @@ static PyObject* gca_breakpoint_remove_all(PyObject *self, PyObject *args)
 	return Py_True;
 }
 
+static PyObject* gca_monitor_output(PyObject *self, PyObject *args)
+{
+	uint8_t *data;
+	int len;
+	int ret = 1;
+
+	if(!PyArg_ParseTuple(args, "s#:gdb_monitor_output", (char *)&data, &len))
+		return NULL;
+
+	printf("%s\n", data);
+	ret = gdb_monitor_write(NULL, data, len);
+	gdb_monitor_write(NULL, (const uint8_t *)"\n", 1);
+
+	return Py_BuildValue("i", ret);
+}
+
 static PyMethodDef GcaMethods[] = {
 	{"target_memory_write", gca_target_memory_write, METH_VARARGS, "Write target memory"},
 	{"target_memory_read", gca_target_memory_read, METH_VARARGS, "Read target memory"},
@@ -712,6 +775,8 @@ static PyMethodDef GcaMethods[] = {
 	{"breakpoint_insert", gca_breakpoint_insert, METH_VARARGS, "Insert breakpoint"},
 	{"breakpoint_remove", gca_breakpoint_remove, METH_VARARGS, "Remove breakpoint"},
 	{"breakpoint_remove_all", gca_breakpoint_remove_all, METH_VARARGS, "Remove all breakpoints"},
+	{"monitor_output", gca_monitor_output, METH_VARARGS, "Write text to remote gdb"},
+
 	{NULL, NULL, 0, NULL}
 };
 
