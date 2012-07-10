@@ -729,44 +729,43 @@ help:
 #if CONFIG_GCA
 static void do_gca_command(Monitor *mon, const QDict *qdict)
 {
-	const char *cmd = qdict_get_try_str(qdict, "cmd");
-	const char *arg = qdict_get_try_str(qdict, "arg");
-	char *out;
+    const char *cmd = qdict_get_try_str(qdict, "cmd");
+    const char *arg = qdict_get_try_str(qdict, "arg");
+    char *out;
 
-	if (!gca_active()) {
-		monitor_printf(mon, "GCA not active\n");
-		return;
-	}
+    if (!gca_active()) {
+        monitor_printf(mon, "GCA not active\n");
+        return;
+    }
 
-	out = gca_monitor_command(cmd, arg);
-	if (out) {
-		monitor_printf(mon, "%s\n", out);
-	}
+    out = gca_monitor_command(cmd, arg);
+    if (out) {
+        monitor_printf(mon, "%s\n", out);
+    }
 
-	free(out);
+    free(out);
 }
 
 static void do_gca_script_command(Monitor *mon, const QDict *qdict)
 {
-	const char *action = qdict_get_try_str(qdict, "action");
-	const char *script = qdict_get_try_str(qdict, "script");
-	int ret;
+    const char *action = qdict_get_try_str(qdict, "action");
+    const char *script = qdict_get_try_str(qdict, "script");
+    int ret;
 
-	if (!strcmp(action, "load")) {
-		if (!script) {
-			monitor_printf(mon, "Missing argument\n");
-			return;
-		}
-		ret = gca_init(script);
+    if (!strcmp(action, "load")) {
+        if (!script) {
+            monitor_printf(mon, "Missing argument\n");
+            return;
+        }
 
-		if (ret) {
-			monitor_printf(mon, "Error loading script '%s'\n", script);
-		}
-	} else if (strcmp(action, "unload") == 0) {
-		gca_destroy();
-	}
+        ret = gca_init(script);
+        if (ret) {
+            monitor_printf(mon, "Error loading script '%s'\n", script);
+        }
+    } else if (strcmp(action, "unload") == 0) {
+        gca_destroy();
+    }
 }
-
 #endif
 
 CommandInfoList *qmp_query_commands(Error **errp)

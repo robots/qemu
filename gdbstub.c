@@ -294,8 +294,8 @@ typedef struct GDBState {
     CPUState *c_cpu; /* current CPU for step/continue ops */
     CPUState *g_cpu; /* current CPU for other ops */
     CPUState *query_cpu; /* for q{f|s}ThreadInfo */
-		target_ulong c_tid;
-		target_ulong g_tid;
+    target_ulong c_tid;
+    target_ulong g_tid;
     enum RSState state; /* parsing state */
     char line_buf[MAX_PACKET_LENGTH];
     int line_buf_index;
@@ -927,10 +927,10 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
         case 81: env->npc = tmp; break;
         case 82:
             cpu_put_ccr(env, tmp >> 32);
-	    env->asi = (tmp >> 24) & 0xff;
-	    env->pstate = (tmp >> 8) & 0xfff;
+            env->asi = (tmp >> 24) & 0xff;
+            env->pstate = (tmp >> 8) & 0xfff;
             cpu_put_cwp64(env, tmp & 0xff);
-	    break;
+            break;
         case 83: env->fsr = tmp; break;
         case 84: env->fprs = tmp; break;
         case 85: env->y = tmp; break;
@@ -1029,7 +1029,7 @@ static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
         /* A0-A7 */
         GET_REG32(env->aregs[n - 8]);
     } else {
-	switch (n) {
+        switch (n) {
         case 16: GET_REG32(env->sr);
         case 17: GET_REG32(env->pc);
         }
@@ -1072,9 +1072,9 @@ static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
     if (env->CP0_Config1 & (1 << CP0C1_FP)) {
         if (n >= 38 && n < 70) {
             if (env->CP0_Status & (1 << CP0St_FR))
-		GET_REGL(env->active_fpu.fpr[n - 38].d);
+                GET_REGL(env->active_fpu.fpr[n - 38].d);
             else
-		GET_REGL(env->active_fpu.fpr[n - 38].w[FP_ENDIAN_IDX]);
+                GET_REGL(env->active_fpu.fpr[n - 38].w[FP_ENDIAN_IDX]);
         }
         switch (n) {
         case 70: GET_REGL((int32_t)env->active_fpu.fcr31);
@@ -1092,8 +1092,8 @@ static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
     case 89: GET_REGL((int32_t)env->CP0_PRid);
     }
     if (n >= 73 && n <= 88) {
-	/* 16 embedded regs.  */
-	GET_REGL(0);
+        /* 16 embedded regs.  */
+        GET_REGL(0);
     }
 
     return 0;
@@ -1154,10 +1154,10 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
         break;
     case 72: /* fp, ignored */ break;
     default: 
-	if (n > 89)
-	    return 0;
-	/* Other registers are readonly.  Ignore writes.  */
-	break;
+        if (n > 89)
+            return 0;
+        /* Other registers are readonly.  Ignore writes.  */
+        break;
     }
 
     return sizeof(target_ulong);
@@ -1180,11 +1180,11 @@ static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
     } else if (n < 16) {
         GET_REGL(env->gregs[n]);
     } else if (n >= 25 && n < 41) {
-	GET_REGL(env->fregs[(n - 25) + ((env->fpscr & FPSCR_FR) ? 16 : 0)]);
+        GET_REGL(env->fregs[(n - 25) + ((env->fpscr & FPSCR_FR) ? 16 : 0)]);
     } else if (n >= 43 && n < 51) {
-	GET_REGL(env->gregs[n - 43]);
+        GET_REGL(env->gregs[n - 43]);
     } else if (n >= 51 && n < 59) {
-	GET_REGL(env->gregs[n - (51 - 16)]);
+        GET_REGL(env->gregs[n - (51 - 16)]);
     }
     switch (n) {
     case 16: GET_REGL(env->pc);
@@ -1215,19 +1215,19 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
         } else {
             env->gregs[n] = tmp;
         }
-	return 4;
+        return 4;
     } else if (n < 16) {
         env->gregs[n] = tmp;
-	return 4;
+        return 4;
     } else if (n >= 25 && n < 41) {
-	env->fregs[(n - 25) + ((env->fpscr & FPSCR_FR) ? 16 : 0)] = tmp;
-	return 4;
+        env->fregs[(n - 25) + ((env->fpscr & FPSCR_FR) ? 16 : 0)] = tmp;
+        return 4;
     } else if (n >= 43 && n < 51) {
-	env->gregs[n - 43] = tmp;
-	return 4;
+        env->gregs[n - 43] = tmp;
+        return 4;
     } else if (n >= 51 && n < 59) {
-	env->gregs[n - (51 - 16)] = tmp;
-	return 4;
+        env->gregs[n - (51 - 16)] = tmp;
+        return 4;
     }
     switch (n) {
     case 16: env->pc = tmp; break;
@@ -1253,9 +1253,9 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
 static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
 {
     if (n < 32) {
-	GET_REG32(env->regs[n]);
+        GET_REG32(env->regs[n]);
     } else {
-	GET_REG32(env->sregs[n - 32]);
+        GET_REG32(env->sregs[n - 32]);
     }
     return 0;
 }
@@ -1265,14 +1265,14 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
     uint32_t tmp;
 
     if (n > NUM_CORE_REGS)
-	return 0;
+        return 0;
 
     tmp = ldl_p(mem_buf);
 
     if (n < 32) {
-	env->regs[n] = tmp;
+        env->regs[n] = tmp;
     } else {
-	env->sregs[n - 32] = tmp;
+        env->sregs[n - 32] = tmp;
     }
     return 4;
 }
@@ -1322,14 +1322,14 @@ static int cpu_gdb_read_register(CPUState *env, uint8_t *mem_buf, int n)
 
     srs = env->pregs[PR_SRS];
     if (n < 16) {
-	GET_REG32(env->regs[n]);
+        GET_REG32(env->regs[n]);
     }
 
     if (n >= 21 && n < 32) {
-	GET_REG32(env->pregs[n - 16]);
+        GET_REG32(env->pregs[n - 16]);
     }
     if (n >= 33 && n < 49) {
-	GET_REG32(env->sregs[srs][n - 33]);
+        GET_REG32(env->sregs[srs][n - 33]);
     }
     switch (n) {
     case 16: GET_REG8(env->pregs[0]);
@@ -1348,16 +1348,16 @@ static int cpu_gdb_write_register(CPUState *env, uint8_t *mem_buf, int n)
     uint32_t tmp;
 
     if (n > 49)
-	return 0;
+        return 0;
 
     tmp = ldl_p(mem_buf);
 
     if (n < 16) {
-	env->regs[n] = tmp;
+        env->regs[n] = tmp;
     }
 
     if (n >= 21 && n < 32) {
-	env->pregs[n - 16] = tmp;
+        env->pregs[n - 16] = tmp;
     }
 
     /* FIXME: Should support function regs be writable?  */
@@ -1774,28 +1774,28 @@ static int gdb_write_register(CPUState *env, uint8_t *mem_buf, int reg)
 
 void gdb_read_registers(CPUState *env, uint8_t *mem_buf, target_ulong *len)
 {
-	target_ulong addr;
-	target_ulong reg_size;
-	target_ulong offset = 0;
+    target_ulong addr;
+    target_ulong reg_size;
+    target_ulong offset = 0;
 
-	for (addr = 0; addr < num_g_regs; addr++) {
-		reg_size = gdb_read_register(env, mem_buf + offset, addr);
-		offset += reg_size;
-	}
+    for (addr = 0; addr < num_g_regs; addr++) {
+        reg_size = gdb_read_register(env, mem_buf + offset, addr);
+        offset += reg_size;
+    }
 
-	*len = offset;
+    *len = offset;
 }
 
 void gdb_write_registers(CPUState *env, uint8_t *mem_buf, target_ulong len)
 {
-	target_ulong addr;
-	target_ulong reg_size;
+    target_ulong addr;
+    target_ulong reg_size;
 
-	for (addr = 0; addr < num_g_regs && len > 0; addr++) {
-		reg_size = gdb_write_register(env, mem_buf, addr);
-		len -= reg_size;
-		mem_buf += reg_size;
-	}
+    for (addr = 0; addr < num_g_regs && len > 0; addr++) {
+        reg_size = gdb_write_register(env, mem_buf, addr);
+        len -= reg_size;
+        mem_buf += reg_size;
+    }
 }
 
 #if !defined(TARGET_XTENSA)
@@ -2011,14 +2011,18 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
     ch = *p++;
     switch(ch) {
     case '?':
-				if (gca_active()) {
-					snprintf(buf, sizeof(buf), "T%02xthread:%08x;", GDB_SIGNAL_TRAP,
-									 gca_thread_getcurrent(s->c_cpu));
-				} else {
-					/* TODO: Make this return the correct value for user-mode.  */
-					snprintf(buf, sizeof(buf), "T%02xthread:%02x;", GDB_SIGNAL_TRAP,
-									 gdb_id(s->c_cpu));
-				}
+#ifdef CONFIG_GCA
+        if (gca_active()) {
+            snprintf(buf, sizeof(buf), "T%02xthread:%08x;", GDB_SIGNAL_TRAP,
+                gca_thread_getcurrent(s->c_cpu));
+        } else {
+#endif
+        /* TODO: Make this return the correct value for user-mode.  */
+        snprintf(buf, sizeof(buf), "T%02xthread:%02x;", GDB_SIGNAL_TRAP,
+            gdb_id(s->c_cpu));
+#ifdef CONFIG_GCA
+        }
+#endif
         put_packet(s, buf);
         /* Remove all the breakpoints when this query is issued,
          * because gdb is doing and initial connect and the state
@@ -2027,7 +2031,7 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         gdb_breakpoint_remove_all();
         break;
     case 'c':
-				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
+        // TODO: replace s->c_cpu with thread_to_cpu(c->c_tid)
         if (*p != '\0') {
             addr = strtoull(p, (char **)&p, 16);
             gdb_set_cpu_pc(s, addr);
@@ -2036,7 +2040,7 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         gdb_continue(s);
         return RS_IDLE;
     case 'C':
-				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
+        // TODO: replace s->c_cpu with thread_to_cpu(c->c_tid)
         s->signal = gdb_signal_to_target (strtoul(p, (char **)&p, 16));
         if (s->signal == -1)
             s->signal = 0;
@@ -2145,30 +2149,38 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         }
         break;
     case 'g':
-				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
-				env = first_cpu;
-				if (gca_active()) {
-					gca_thread_regs_read(env, s->g_tid, mem_buf, &len);
-				} else {
-					cpu_synchronize_state(env);
-					len = 0;
-					gdb_read_registers(env, mem_buf, &len);
-				}
+        // TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+        env = first_cpu;
+        cpu_synchronize_state(env);
+#ifdef CONFIG_GCA
+        if (gca_active()) {
+            gca_thread_regs_read(env, s->g_tid, mem_buf, &len);
+        } else {
+#endif
+            len = 0;
+            gdb_read_registers(env, mem_buf, &len);
+#ifdef CONFIG_GCA
+        }
+#endif
         memtohex(buf, mem_buf, len);
         put_packet(s, buf);
         break;
     case 'G':
-				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
-				env = s->g_cpu;
-				registers = mem_buf;
-				len = strlen(p) / 2;
-				hextomem((uint8_t *)registers, p, len);
-				if (gca_active()) {
-					gca_thread_regs_write(env, s->g_tid, registers, len); 
-				} else {
-					cpu_synchronize_state(env);
-					gdb_write_registers(env, registers, len);
-				}
+        // TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+        env = s->g_cpu;
+        registers = mem_buf;
+        len = strlen(p) / 2;
+        hextomem((uint8_t *)registers, p, len);
+        cpu_synchronize_state(env);
+#ifdef CONFIG_GCA
+        if (gca_active()) {
+            gca_thread_regs_write(env, s->g_tid, registers, len);
+        } else {
+#endif
+            gdb_write_registers(env, registers, len);
+#ifdef CONFIG_GCA
+        }
+#endif
         put_packet(s, "OK");
         break;
     case 'm':
@@ -2176,23 +2188,27 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         if (*p == ',')
             p++;
         len = strtoull(p, NULL, 16);
-				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
-				env = first_cpu;
-				if (gca_active()) {
-					if (gca_thread_mem_read(env, s->g_tid, addr, mem_buf, len)) {
-						memtohex(buf, mem_buf, len);
-						put_packet(s, buf);
-					} else {
-						put_packet (s, "E14");
-					}
-				} else {
-					if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 0) != 0) {
-							put_packet (s, "E14");
-					} else {
-							memtohex(buf, mem_buf, len);
-							put_packet(s, buf);
-					}
-				}
+        // TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+        env = first_cpu;
+#ifdef CONFIG_GCA
+        if (gca_active()) {
+            if (gca_thread_mem_read(env, s->g_tid, addr, mem_buf, len)) {
+                memtohex(buf, mem_buf, len);
+                put_packet(s, buf);
+            } else {
+                put_packet (s, "E14");
+            }
+        } else {
+#endif
+            if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 0) != 0) {
+                put_packet (s, "E14");
+            } else {
+                memtohex(buf, mem_buf, len);
+                put_packet(s, buf);
+            }
+#ifdef CONFIG_GCA
+        }
+#endif
         break;
     case 'M':
         addr = strtoull(p, (char **)&p, 16);
@@ -2202,26 +2218,32 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         if (*p == ':')
             p++;
         hextomem(mem_buf, p, len);
-				// TODO: first cpu should be  thread_to_cpu(s->g_tid)!
-				env = first_cpu;
-				if (gca_active()) {
-					if (gca_thread_mem_write(env, s->g_tid, addr, mem_buf, len)) {
-							put_packet(s, "OK");
-					} else {
-							put_packet(s, "E14");
-					}
-				} else {
-					if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 1) != 0) {
-							put_packet(s, "E14");
-					} else {
-							put_packet(s, "OK");
-					}
-				}
+        // TODO: first cpu should be  thread_to_cpu(s->g_tid)!
+        env = first_cpu;
+#ifdef CONFIG_GCA
+        if (gca_active()) {
+            if (gca_thread_mem_write(env, s->g_tid, addr, mem_buf, len)) {
+                put_packet(s, "OK");
+            } else {
+                put_packet(s, "E14");
+            }
+        } else {
+#endif
+            if (target_memory_rw_debug(s->g_cpu, addr, mem_buf, len, 1) != 0) {
+                put_packet(s, "E14");
+            } else {
+                put_packet(s, "OK");
+            }
+#ifdef CONFIG_GCA
+        }
+#endif
         break;
     case 'p':
-				// TODO: we should probably handle this :-)
-				if (gca_active())
-					goto unknown_command;
+#ifdef CONFIG_GCA
+        // TODO: we should probably handle this :-)
+        if (gca_active())
+            goto unknown_command;
+#endif
 
         /* Older gdb are really dumb, and don't use 'g' if 'p' is avaialable.
            This works, but can be very slow.  Anything new enough to
@@ -2238,9 +2260,11 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         }
         break;
     case 'P':
-				// TODO: we should probably handle this :-)
-				if (gca_active())
-					goto unknown_command;
+#ifdef CONFIG_GCA
+        // TODO: we should probably handle this :-)
+        if (gca_active())
+            goto unknown_command;
+#endif
 
         if (!gdb_has_xml)
             goto unknown_command;
@@ -2280,64 +2304,64 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             break;
         }
 #ifdef CONFIG_GCA
-				if (gca_active()) { // TODO: check thread active!
-					switch (type) {
-					case 'c':
-							s->c_tid = thread;
-							put_packet(s, "OK");
-							break;
-					case 'g':
-							s->g_tid = thread;
-							put_packet(s, "OK");
-							break;
-					default:
-							 put_packet(s, "E22");
-							 break;
-					}
-				} else {
+        if (gca_active()) { // TODO: check thread active!
+            switch (type) {
+            case 'c':
+                s->c_tid = thread;
+                put_packet(s, "OK");
+                break;
+            case 'g':
+                s->g_tid = thread;
+                put_packet(s, "OK");
+                break;
+            default:
+                put_packet(s, "E22");
+                break;
+            }
+        } else {
 #endif
-					env = find_cpu(thread);
-					if (env == NULL) {
-							put_packet(s, "E22");
-							break;
-					}
-					switch (type) {
-					case 'c':
-							s->c_cpu = env;
-							put_packet(s, "OK");
-							break;
-					case 'g':
-							s->g_cpu = env;
-							put_packet(s, "OK");
-							break;
-					default:
-							 put_packet(s, "E22");
-							 break;
-					}
+            env = find_cpu(thread);
+            if (env == NULL) {
+                put_packet(s, "E22");
+                break;
+            }
+            switch (type) {
+            case 'c':
+                s->c_cpu = env;
+                put_packet(s, "OK");
+                break;
+            case 'g':
+                s->g_cpu = env;
+                put_packet(s, "OK");
+                break;
+            default:
+                put_packet(s, "E22");
+                break;
+            }
 #ifdef CONFIG_GCA
-				}
+        }
 #endif
         break;
     case 'T':
         thread = strtoull(p, (char **)&p, 16);
 #ifdef CONFIG_GCA
-				if (gca_active()) {
-					if (gca_thread_isalive(s->g_cpu, thread)) {
-							put_packet(s, "OK");
-					} else {
-							put_packet(s, "E22");
-					}
-				} else {
+        if (gca_active()) {
+            if (gca_thread_isalive(s->g_cpu, thread)) {
+                put_packet(s, "OK");
+            } else {
+                put_packet(s, "E22");
+            }
+        } else {
 #endif
-					env = find_cpu(thread);
+            env = find_cpu(thread);
 
-					if (env != NULL) {
-							put_packet(s, "OK");
-					} else {
-							put_packet(s, "E22");
-					}
+            if (env != NULL) {
+                put_packet(s, "OK");
+            } else {
+                put_packet(s, "E22");
+            }
 #ifdef CONFIG_GCA
-				}
+        }
 #endif
         break;
     case 'q':
@@ -2367,75 +2391,75 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             break;
         } else if (strcmp(p,"C") == 0) {
 #ifdef CONFIG_GCA
-						if (gca_active()) {
-							addr = gca_thread_getcurrent(s->g_cpu);
-							snprintf(buf, sizeof(buf), "QC%x", addr);
-							put_packet(s, buf);
-						} else {
+            if (gca_active()) {
+                addr = gca_thread_getcurrent(s->g_cpu);
+                snprintf(buf, sizeof(buf), "QC%x", addr);
+                put_packet(s, buf);
+            } else {
 #endif
-							/* "Current thread" remains vague in the spec, so always return
-							 *  the first CPU (gdb returns the first thread). */
-							put_packet(s, "QC1");
+                /* "Current thread" remains vague in the spec, so always return
+                 *  the first CPU (gdb returns the first thread). */
+                put_packet(s, "QC1");
 #ifdef CONFIG_GCA
-						}
+            }
 #endif
             break;
         } else if (strcmp(p,"fThreadInfo") == 0) {
 #ifdef CONFIG_GCA
-						if (gca_active()) {
-							gca_threadlist_create(s->g_cpu);
-						} else {
+            if (gca_active()) {
+                gca_threadlist_create(s->g_cpu);
+            } else {
 #endif
-							s->query_cpu = first_cpu;
+                s->query_cpu = first_cpu;
 #ifdef CONFIG_GCA
-						}
+            }
 #endif
-						goto report_cpuinfo;
+            goto report_cpuinfo;
         } else if (strcmp(p,"sThreadInfo") == 0) {
         report_cpuinfo:
 #ifdef CONFIG_GCA
-						if (gca_active()) {
-							if (gca_threadlist_count(s->g_cpu) > 0) {
-								snprintf(buf, sizeof(buf), "m%x", gca_threadlist_getnext(s->g_cpu));
-								put_packet(s, buf);
-							} else {
-								put_packet(s, "l");
-							}
-						} else {
+            if (gca_active()) {
+                if (gca_threadlist_count(s->g_cpu) > 0) {
+                    snprintf(buf, sizeof(buf), "m%x", gca_threadlist_getnext(s->g_cpu));
+                    put_packet(s, buf);
+                } else {
+                    put_packet(s, "l");
+                }
+            } else {
 #endif
-							if (s->query_cpu) {
-									snprintf(buf, sizeof(buf), "m%x", gdb_id(s->query_cpu));
-									put_packet(s, buf);
-									s->query_cpu = s->query_cpu->next_cpu;
-							} else {
-									put_packet(s, "l");
-							}
+                if (s->query_cpu) {
+                    snprintf(buf, sizeof(buf), "m%x", gdb_id(s->query_cpu));
+                    put_packet(s, buf);
+                    s->query_cpu = s->query_cpu->next_cpu;
+                } else {
+                    put_packet(s, "l");
+                }
 #ifdef CONFIG_GCA
-						}
+            }
 #endif
             break;
         } else if (strncmp(p,"ThreadExtraInfo,", 16) == 0) {
-						thread = strtoull(p+16, (char **)&p, 16);
+            thread = strtoull(p+16, (char **)&p, 16);
 #ifdef CONFIG_GCA
-						if (gca_active()) {
-							env = s->g_cpu; // TODO: need to find correct cpu for thread
-							gca_thread_getinfo(env, thread, (char *)mem_buf, &len);
+            if (gca_active()) {
+                env = s->g_cpu; // TODO: need to find correct cpu for thread
+                gca_thread_getinfo(env, thread, (char *)mem_buf, &len);
 
-							memtohex(buf, mem_buf, len);
-							put_packet(s, buf);
-						} else {
+                memtohex(buf, mem_buf, len);
+                put_packet(s, buf);
+            } else {
 #endif
-							env = find_cpu(thread);
-							if (env != NULL) {
-									cpu_synchronize_state(env);
-									len = snprintf((char *)mem_buf, sizeof(mem_buf),
-																 "CPU#%d [%s]", env->cpu_index,
-																 env->halted ? "halted " : "running");
-							}
-							memtohex(buf, mem_buf, len);
-							put_packet(s, buf);
+                env = find_cpu(thread);
+                if (env != NULL) {
+                    cpu_synchronize_state(env);
+                    len = snprintf((char *)mem_buf, sizeof(mem_buf),
+                        "CPU#%d [%s]", env->cpu_index,
+                        env->halted ? "halted " : "running");
+                }
+                memtohex(buf, mem_buf, len);
+                put_packet(s, buf);
 #ifdef CONFIG_GCA
-						}
+            }
 #endif
             break;
         }
@@ -2518,32 +2542,36 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
 #endif
         if (strncmp(p, "Symbol:", 7) == 0) {
 #ifdef CONFIG_GCA
-					if (gca_active()) {
-						if (*(p+7) != ':') {
-							addr = strtoull(p+7, (char **)&p, 16);
-							if (*p == ':') p++;
-							len = strlen(p);
-							hextomem(mem_buf, p, len);
-							mem_buf[len] = 0;
-							gca_symbol_add((const char *)mem_buf, addr);
-						}
-						if (gca_symbol_getunknown((char *)mem_buf, &len)) {
-							off = snprintf(buf, sizeof(buf), "qSymbol:");
-							if (off + len < MAX_PACKET_LENGTH) {
-								memtohex(buf + off, mem_buf, len);
-							}
-							put_packet(s, buf);
-						} else {
-							put_packet(s, "OK");
-						}
-					} else {
+            if (gca_active()) {
+                if (*(p+7) != ':') {
+                    addr = strtoull(p+7, (char **)&p, 16);
+
+                    if (*p == ':')
+                        p++;
+
+                    len = strlen(p);
+                    hextomem(mem_buf, p, len);
+                    mem_buf[len/2] = 0;
+                    gca_symbol_add((const char *)mem_buf, addr);
+                }
+
+                if (gca_symbol_getunknown((char *)mem_buf, &len)) {
+                    off = snprintf(buf, sizeof(buf), "qSymbol:");
+                    if (off + len < MAX_PACKET_LENGTH) {
+                        memtohex(buf + off, mem_buf, len);
+                    }
+                    put_packet(s, buf);
+                } else {
+                    put_packet(s, "OK");
+                }
+            } else {
 #endif
-						put_packet(s, "OK");
+                put_packet(s, "OK");
 #ifdef CONFIG_GCA
-					}
+            }
 #endif
-					break;
-				}
+            break;
+        }
         /* Unrecognised 'q' command.  */
         goto unknown_command;
 
