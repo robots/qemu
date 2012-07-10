@@ -2086,13 +2086,35 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
             }
             if (res) {
                 if (res_thread != -1 && res_thread != 0) {
-                    env = find_cpu(res_thread);
+#ifdef CONFIG_GCA
+                    if (gca_active()) {
+                        // TODO: replace with thread_to_cpu(res_thread)
+                        env = first_cpu;
+                        s->c_tid = res_thread;
+                    } else {
+#endif
+                        env = find_cpu(res_thread);
+#ifdef CONFIG_GCA
+                    }
+#endif
                     if (env == NULL) {
                         put_packet(s, "E22");
                         break;
                     }
                     s->c_cpu = env;
                 }
+#ifdef CONFIG_GCA
+                if (gca_active()) {
+                    env = first_cpu;
+                    // TODO: save gdb command, and replay it later (when current == c->c_tid)
+                    if (gca_thread_getcurrent(env) != s->c_tid && s->c_tid != 0) {
+                        gca_thread_settarget(env, s->c_tid);
+                        //cpu_single_step(s->c_cpu, sstep_flags);
+                        gdb_continue(s);
+                        return RS_IDLE;
+                    }
+                }
+#endif
                 if (res == 's') {
                     cpu_single_step(s->c_cpu, sstep_flags);
                 }
@@ -2116,7 +2138,19 @@ static int gdb_handle_packet(GDBState *s, const char *line_buf)
         put_packet(s, "OK");
         break;
     case 's':
-				// TODO: replace s->c_cpu with thread_to_cpu(c->c_tid) 
+#ifdef CONFIG_GCA
+        // TODO: replace s->c_cpu with thread_to_cpu(c->c_tid)
+        if (gca_active()) {
+            env = first_cpu;
+            if (gca_thread_getcurrent(env) != s->c_tid && s->c_tid != 0) {
+                // start stepping until necessary
+                gca_thread_settarget(env, s->c_tid);
+                //cpu_single_step(s->c_cpu, sstep_flags);
+                gdb_continue(s);
+                return RS_IDLE;
+            }
+        }
+#endif
         if (*p != '\0') {
             addr = strtoull(p, (char **)&p, 16);
             gdb_set_cpu_pc(s, addr);
